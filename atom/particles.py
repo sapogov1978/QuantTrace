@@ -55,16 +55,21 @@ class Particle:
         return hash((self.position, self.momentum, self.bound))
 
     def is_antiparticle(self) -> bool:
+        if self.symbol == "γ":
+            return True  # Photon is its own antiparticle
         return self.symbol.startswith("anti-")
 
     def antiparticle(self: T) -> T:
         """
         Returns the corresponding antiparticle.
-        If this particle is already an antiparticle, returns the original particle.
+        If the particle is its own antiparticle (like the photon), returns itself.
         """
+        if self.symbol == "γ":
+            return self  # photon is its own antiparticle
+
         is_anti = self.is_antiparticle()
         if is_anti and self.symbol.startswith("anti-"):
-            new_symbol = self.symbol[len("anti-"):]  # remove exactly one "anti-" prefix
+            new_symbol = self.symbol[len("anti-"):]  # remove "anti-" prefix
         else:
             new_symbol = f"anti-{self.symbol}"
 
@@ -81,7 +86,7 @@ class Particle:
             symbol=new_symbol
         )
         
-    def as_dict(self) -> dict:
+    def as_dict(self) -> dict[str, str | float | bool | tuple | int]:
         """
         Returns a dictionary representation of the particle, useful for
         serialization, visualization, or debugging.
@@ -109,7 +114,7 @@ class Proton(Particle):
         bound: bool = False
     ):
         super().__init__(
-            color_rgb=(255, 0, 0),
+            color_rgb=(255, 0, 0), # Red for proton
             position=position,
             momentum=momentum,
             bound=bound,
@@ -130,7 +135,7 @@ class Neutron(Particle):
         bound: bool = False
     ):
         super().__init__(
-            color_rgb=(128, 128, 128),
+            color_rgb=(128, 128, 128), # Gray for neutron
             position=position,
             momentum=momentum,
             bound=bound,
@@ -140,4 +145,45 @@ class Neutron(Particle):
             magnetic_moment=-1.91,
             radius_m=0.84e-15,
             symbol="n0"
+        )
+    
+
+class Electron(Particle):
+    def __init__(
+        self,
+        position: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+        momentum: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+        bound: bool = False
+    ):
+        super().__init__(
+            color_rgb=(0, 0, 255),  # Blue for electron
+            position=position,
+            momentum=momentum,
+            bound=bound,
+            mass_kg=9.1093837015e-31,
+            charge=Charge.NEGATIVE,
+            spin=0.5,
+            magnetic_moment=-1.00115965218128,
+            radius_m=2.8179403227e-15,    # Classical electron radius (model parameter)
+            symbol="e-"
+        )
+
+class Photon(Particle):
+    def __init__(
+        self,
+        position: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+        momentum: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+        bound: bool = False
+    ):
+        super().__init__(
+            color_rgb=(255, 255, 0),  # Yellow for photon
+            position=position,
+            momentum=momentum,
+            bound=bound,
+            mass_kg=0.0,
+            charge=Charge.NEUTRAL,
+            spin=1.0,
+            magnetic_moment=0.0,
+            radius_m=0.0,
+            symbol="γ"
         )
