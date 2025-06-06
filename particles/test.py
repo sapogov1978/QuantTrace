@@ -1,4 +1,7 @@
 from particles import Proton, Neutron, Electron
+import math
+
+c = 299_792_458  # lightspeed, m/s
 
 # IUPAC 2018
 # 1 amu = 1.66053906660e-27 kg
@@ -18,7 +21,7 @@ class Atom:
         self.symbol = symbol
         self.protons = [Proton() for _ in range(protons)]
         self.neutrons = [Neutron() for _ in range(neutrons)]
-        self.electrons = [Electron() for _ in range(electrons)]
+        self.electrons = [Electron(momentum=(0.0, 0.0, 1e-22)) for _ in range(electrons)]
 
     def computed_mass(self) -> float:
         return (
@@ -58,3 +61,37 @@ for atom in atoms:
     print(f"{s['symbol']:^6} | {s['Z (protons)']:^3} | {s['N (neutrons)']:^3} | {s['electrons']:^3} | "
           f"{s['computed_mass (kg)']:.4e}     | {s['reference_mass (kg)']:.4e}     | {s['delta %']:.2f}")
 
+
+print("\nDetailed velocity check:")
+print(f"{'Particle':^10} | {'vx (m/s)':^12} | {'vy (m/s)':^12} | {'vz (m/s)':^12} | {'|v| (m/s)':^12}")
+print("-" * 65)
+
+for atom in atoms:
+    for particle in atom.protons + atom.neutrons + atom.electrons:
+        vx, vy, vz = particle.velocity()
+        v_mag = (vx**2 + vy**2 + vz**2) ** 0.5
+        print(f"{particle.__class__.__name__:^10} | {vx:12.4e} | {vy:12.4e} | {vz:12.4e} | {v_mag:12.4e}")
+
+
+print("\nVelocity theoretical comparison:")
+print(f"{'Particle':^10} | {'|v_measured| (m/s)':^20} | {'|v_expected| (m/s)':^20} | {'Δ %':^8}")
+print("-" * 70)
+
+for atom in atoms:
+    for particle in atom.protons + atom.neutrons + atom.electrons:
+        px, py, pz = particle.momentum
+        p = (px**2 + py**2 + pz**2) ** 0.5
+
+        vx, vy, vz = particle.velocity()
+        v_measured = (vx**2 + vy**2 + vz**2) ** 0.5
+
+        if particle.mass_kg == 0.0:
+            v_expected = c
+        else:
+            mc2 = particle.mass_kg * c**2
+            E = math.sqrt((p * c)**2 + mc2**2)
+            v_expected = (p * c**2) / E if E != 0 else 0.0
+
+        delta_pct = 100 * abs(v_measured - v_expected) / v_expected if v_expected != 0 else 0.0
+
+        print(f"{particle.__class__.__name__:^10} | {v_measured:20.4e} | {v_expected:20.4e} | {delta_pct:8.4f}")

@@ -1,13 +1,14 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import Tuple, TypeVar
+from typing import Tuple, Optional, List
+import math
+
+c = 299_792_458  # lightspeed, m/s
 
 class Charge(Enum):
     POSITIVE = +1
     NEGATIVE = -1
     NEUTRAL = 0
-
-T = TypeVar('T', bound='Particle')
 
 @dataclass
 class Particle:
@@ -28,6 +29,10 @@ class Particle:
     magnetic_moment: float
     radius_m: float
     symbol: str
+    
+    # --
+    birth_time: float = 0.0
+    alive: bool = True
     
     def __str__(self):
         return (
@@ -59,7 +64,7 @@ class Particle:
             return True  # Photon is its own antiparticle
         return self.symbol.startswith("anti-")
 
-    def antiparticle(self: T) -> T:
+    def antiparticle(self) -> 'Particle':
         """
         Returns the corresponding antiparticle.
         If the particle is its own antiparticle (like the photon), returns itself.
@@ -105,13 +110,67 @@ class Particle:
             "color_rgb": self.color_rgb,
             "is_antiparticle": self.is_antiparticle()
         }
+    
+    def destroy(self):
+        self.alive = False
+
+    def update(self, time_now: float) -> Optional[List['Particle']]:
+        """
+        Called on Particle System updates.
+        Return new particles list or None.
+        """
+        return None
+    
+    def age(self, sim_time_now: float) -> float:
+        return sim_time_now - self.birth_time
+    
+    def energy(self) -> float:
+        """
+        E = sqrt((pc)^2 + (m c^2)^2)
+        """
+        px, py, pz = self.momentum
+        p2 = px*px + py*py + pz*pz
+        return math.sqrt(p2 * c**2 + (self.mass_kg * c**2)**2)
+    
+    def velocity(self) -> Tuple[float, float, float]:
+        px, py, pz = self.momentum
+        p_magnitude = math.sqrt(px*px + py*py + pz*pz)
+
+        if p_magnitude == 0:
+            return (0.0, 0.0, 0.0)
+
+        if self.mass_kg == 0.0:
+            vx = (px / p_magnitude) * c
+            vy = (py / p_magnitude) * c
+            vz = (pz / p_magnitude) * c
+        else:
+            E = self.energy()
+            # relative speed: v = pc² / E
+            vx = (px * c**2) / E
+            vy = (py * c**2) / E
+            vz = (pz * c**2) / E
+
+        # Ensure speed does not exceed the speed of light
+        speed = math.sqrt(vx*vx + vy*vy + vz*vz)
+        if speed > c:
+            factor = c / speed
+            return (vx * factor, vy * factor, vz * factor)
+
+        return (vx, vy, vz)
+    
+    def move(self, dt: float):
+        vx, vy, vz = self.velocity()
+        x, y, z = self.position
+        self.position = (x + vx * dt, y + vy * dt, z + vz * dt)
+
 
 class Proton(Particle):
     def __init__(
         self,
         position: Tuple[float, float, float] = (0.0, 0.0, 0.0),
         momentum: Tuple[float, float, float] = (0.0, 0.0, 0.0),
-        bound: bool = False
+        bound: bool = False,
+        birth_time: float = 0.0
     ):
         super().__init__(
             color_rgb=(255, 0, 0), # Red for proton
@@ -123,6 +182,7 @@ class Proton(Particle):
             spin=0.5,
             magnetic_moment=2.79,
             radius_m=0.84e-15,
+            birth_time=birth_time,
             symbol="p+"
         )
 
@@ -132,7 +192,8 @@ class Neutron(Particle):
         self,
         position: Tuple[float, float, float] = (0.0, 0.0, 0.0),
         momentum: Tuple[float, float, float] = (0.0, 0.0, 0.0),
-        bound: bool = False
+        bound: bool = False,
+        birth_time: float = 0.0
     ):
         super().__init__(
             color_rgb=(128, 128, 128), # Gray for neutron
@@ -144,6 +205,7 @@ class Neutron(Particle):
             spin=0.5,
             magnetic_moment=-1.91,
             radius_m=0.84e-15,
+            birth_time=birth_time,
             symbol="n0"
         )
     
@@ -153,7 +215,8 @@ class Electron(Particle):
         self,
         position: Tuple[float, float, float] = (0.0, 0.0, 0.0),
         momentum: Tuple[float, float, float] = (0.0, 0.0, 0.0),
-        bound: bool = False
+        bound: bool = False,
+        birth_time: float = 0.0
     ):
         super().__init__(
             color_rgb=(0, 0, 255),  # Blue for electron
@@ -165,6 +228,7 @@ class Electron(Particle):
             spin=0.5,
             magnetic_moment=-1.00115965218128,
             radius_m=2.8179403227e-15,    # Classical electron radius (model parameter)
+            birth_time=birth_time,
             symbol="e-"
         )
 
@@ -173,7 +237,8 @@ class Photon(Particle):
         self,
         position: Tuple[float, float, float] = (0.0, 0.0, 0.0),
         momentum: Tuple[float, float, float] = (0.0, 0.0, 0.0),
-        bound: bool = False
+        bound: bool = False,
+        birth_time: float = 0.0
     ):
         super().__init__(
             color_rgb=(255, 255, 0),  # Yellow for photon
@@ -185,5 +250,29 @@ class Photon(Particle):
             spin=1.0,
             magnetic_moment=0.0,
             radius_m=0.0,
+            birth_time=birth_time,
             symbol="γ"
+        )
+
+class Neutrino(Particle):
+    def __init__(
+        self,
+        position: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+        momentum: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+        bound: bool = False,
+        is_antiparticle: bool = False,
+        birth_time: float = 0.0
+    ):
+        super().__init__(
+            color_rgb=(0, 255, 0),  # Зеленый, условно
+            position=position,
+            momentum=momentum,
+            bound=bound,
+            mass_kg=1e-36,
+            charge=Charge.NEUTRAL,
+            spin=0.5,
+            magnetic_moment=0.0,
+            radius_m=0.0,
+            birth_time=birth_time,
+            symbol="νₑ"
         )
